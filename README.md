@@ -41,5 +41,5 @@ let params = VGCellularRequestParameters(url: "http://www.vonage.com",
                                         queryParameters: ["query-param" : "value"]
                                         maxRedirectCount: 10)
         
-let response = try await client.startCellularRequest(params: params)
+let response = try await client.startCellularGetRequest(params: params)
 ```
