@@ -77,3 +77,79 @@ let response = try await client.startCellularRequest(params: params, debug: true
 ```
 
 Potential error codes: `sdk_no_data_connectivity`, `sdk_connection_error`, `sdk_redirect_error`, `sdk_error`.
+
+## Migrating from `VonageClientSDKNumberVerification` or `VonageClientSDKSilentAuth`
+
+`VonageClientLibrary` replaces both `VonageClientSDKNumberVerification` and `VonageClientSDKSilentAuth`
+. To migrate from them do the following:
+
+### Update your Dependencies:
+
+You will need to add `VonageClientLibrary` as a [dependency](#installation) and remove either `VonageClientSDKNumberVerification` or `VonageClientSDKSilentAuth`
+ depending on which one you were using. 
+
+### Update the Imports:
+
+```swift
+// VonageClientSDKNumberVerification
+import VonageClientSDKNumberVerification
+``` 
+
+or
+
+```swift
+// VonageClientSDKSilentAuth
+import VonageClientSDKSilentAuth
+``` 
+ 
+should be replaced with:
+
+```swift
+import VonageClientLibrary
+```
+
+### Use the new Client:
+
+```swift
+// VonageClientSDKNumberVerification
+let client = VGNumberVerificationClient()
+``` 
+
+or
+
+```swift
+// VonageClientSDKSilentAuth
+let client = VGSilentAuthClient()
+``` 
+ 
+should be replaced with:
+
+```swift
+let client = VGCellularRequestClient()
+```
+
+### Make the new Network Call:
+
+`VonageClientLibrary` uses a params object to pass information to the function that makes the network call. This is a similar approach to `VonageClientSDKNumberVerification`, but new if you are using `VonageClientSDKSilentAuth`.
+
+```swift
+// VonageClientSDKNumberVerification
+let params = VGNumberVerificationParameters(url: "http://www.vonage.com",
+                                            headers: ["x-my-header": "My Value"],
+                                            queryParameters: ["query-param" : "value"]
+                                            maxRedirectCount: 10
+                )
+        
+let response = try await client.startNumberVerification(params: params)
+```
+
+or 
+
+```swift
+// VonageClientSDKSilentAuth
+client.openWithDataCellular(url: url, debug: true) { response in
+    ...
+}
+```
+
+should be replaced with the `VonageClientLibrary` [example](#force-a-cellular-network-request) above.
