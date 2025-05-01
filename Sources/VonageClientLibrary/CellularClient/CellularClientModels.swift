@@ -34,7 +34,7 @@ public class DebugInfo {
     }
     
     public func userAgent(sdkVersion: String) -> String {
-        return "vgnv-sdk-ios/\(sdkVersion) \(deviceString())"
+        return "vonage-client-library-ios/\(sdkVersion) \(deviceString())"
     }
     
     public func deviceString() -> String {
