@@ -38,10 +38,10 @@ import VonageClientLibrary
 let client = VGCellularRequestClient()
 let params = VGCellularRequestParameters(url: "http://www.vonage.com",
                                         headers: ["x-my-header": "My Value"],
-                                        queryParameters: ["query-param" : "value"]
+                                        queryParameters: ["query-param" : "value"],
                                         maxRedirectCount: 10)
         
-let response = try await client.startCellularRequest(params: params, debug: true)
+let response = try await client.startCellularGetRequest(params: params, debug: true)
 ```
 
 * `maxRedirectCount` in `VGCellularRequestParameters` is an optional and defaults to 10.
