@@ -17,11 +17,11 @@ class CellularConnectionManager {
     
     // Mitigation for tcp timeout not triggering any events.
     private var timer: Timer?
-    private var CONNECTION_TIME_OUT = 5.0
+    private var CONNECTION_TIME_OUT = 20.0
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
-    private let sdkVersion = "1.0.0"
+    private let sdkVersion = "1.1.0"
     
     lazy var traceCollector: TraceCollector = {
         TraceCollector()
@@ -424,7 +424,7 @@ class CellularConnectionManager {
         timer?.invalidate()
         
         //Read the entire response body
-        connection?.receiveMessage { data, context, isComplete, error in
+        connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, context, isComplete, error in
             
             os_log("Receive isComplete: %s", isComplete.description)
             if let err = error {
