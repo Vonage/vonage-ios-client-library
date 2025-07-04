@@ -37,8 +37,17 @@ class VGCellularClient: CellularClient {
     
     func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool) async -> [String: Any] {
         return await withCheckedContinuation { continuation in
+            var hasResumed = false
+            let lock = NSLock()
             connectionManager.get(url: url, headers: headers, maxRedirectCount: maxRedirectCount, debug: debug) { response in
-                continuation.resume(returning: response)
+                lock.lock()
+                defer { lock.unlock() }
+                if !hasResumed {
+                    hasResumed = true
+                    continuation.resume(returning: response)
+                } else {
+                    print("⚠️ Continuation already resumed.")
+               }
             }
         }
     }
