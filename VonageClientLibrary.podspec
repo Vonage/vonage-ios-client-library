@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
     spec.name         = "VonageClientLibrary"
-    spec.version      = "1.1.0"
+    spec.version      = "1.0.2"
     spec.summary      = "A library to support using the Vonage APIs on iOS"
     spec.homepage     = "https://github.com/Vonage/vonage-ios-client-library"
     spec.license      = { :type => "Apache 2.0", :file => "LICENSE" }

@@ -17,7 +17,7 @@ class CellularConnectionManager {
     
     // Mitigation for tcp timeout not triggering any events.
     private var timer: Timer?
-    private var CONNECTION_TIME_OUT = 20.0
+    private var CONNECTION_TIME_OUT = 5.0
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
