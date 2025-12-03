@@ -169,6 +169,22 @@ class CellularConnectionManager {
             case .preparing:
                 self?.traceCollector.addDebug(log: "Connection State: Preparing\n")
             case .ready:
+                if let tlsMetadata = self?.connection?.metadata(definition: NWProtocolTLS.definition) as? NWProtocolTLS.Metadata {
+                    // Extract the underlying sec_protocol_metadata_t
+                    let secMeta = tlsMetadata.securityProtocolMetadata
+
+                    // Query the negotiated TLS version
+                    let version = sec_protocol_metadata_get_negotiated_tls_protocol_version(secMeta)
+
+                    let versionString: String
+                    version.rawValue
+                       switch version {
+                       case .TLSv12: versionString = "TLS 1.2"
+                       case .TLSv13: versionString = "TLS 1.3"
+                       default: versionString = "Unknown TLS version (\(version.rawValue))"
+                       }
+                    print("using TLS version \(versionString)")
+                }
                 let msg = self?.connection.debugDescription ?? "No connection details"
                 self?.traceCollector.addDebug(log: "Connection State: Ready \(msg)\n")
                 readyStateHandler() //Send and Receive
@@ -258,7 +274,16 @@ class CellularConnectionManager {
         
         if (scheme.starts(with:"https")) {
             fport = (port != nil ? NWEndpoint.Port(integerLiteral: NWEndpoint.Port.IntegerLiteralType(port!)) : NWEndpoint.Port.https)
-            tlsOptions = .init()
+
+            // tlsOptions = .init()
+            tlsOptions = NWProtocolTLS.Options()
+
+            // Force TLS 1.2
+            if let secOptions = tlsOptions?.securityProtocolOptions {
+                sec_protocol_options_set_min_tls_protocol_version(secOptions, .TLSv12)
+                sec_protocol_options_set_max_tls_protocol_version(secOptions, .TLSv12)
+            }
+
             tcpOptions.enableFastOpen = true //Save on tcp round trip by using first tls packet
         }
         
