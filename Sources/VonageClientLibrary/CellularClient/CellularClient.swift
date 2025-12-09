@@ -39,7 +39,7 @@ class VGCellularClient: CellularClient {
         return await withCheckedContinuation { continuation in
             var hasResumed = false
             let lock = NSLock()
-            connectionManager.get(url: url, headers: headers, maxRedirectCount: maxRedirectCount, timeout: timeout, debug: debug) { response in
+            connectionManager.get(url: url, headers: headers, maxRedirectCount: maxRedirectCount, debug: debug, timeout: timeout) { response in
                 lock.lock()
                 defer { lock.unlock() }
                 if !hasResumed {

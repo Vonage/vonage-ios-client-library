@@ -27,7 +27,7 @@ class CellularConnectionManager {
         TraceCollector()
     }()
     
-    func get(url: URL, headers: [String: String], maxRedirectCount: Int, timeout: TimeInterval, debug: Bool, completion: @escaping ([String : Any]) -> Void) {
+    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, completion: @escaping ([String : Any]) -> Void) {
         self.connectionTimeout = timeout
         
         if (debug) {

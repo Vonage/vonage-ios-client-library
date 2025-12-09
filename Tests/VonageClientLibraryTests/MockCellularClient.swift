@@ -12,7 +12,7 @@ import Foundation
 class MockCellularClient: CellularClient {
     var urlString: String = ""
     
-    func get(url: URL, headers: [String : String], maxRedirectCount: Int, debug: Bool) async -> [String : Any] {
+    func get(url: URL, headers: [String : String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval) async -> [String : Any] {
         self.urlString = url.absoluteString
         return [:]
     }

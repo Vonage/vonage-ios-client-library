@@ -46,7 +46,7 @@ enum VGCellularRequestError: Error {
     ///   - debug: A flag to include or not the url trace in the response, defaults to false
     @objc public func startCellularGetRequest(params: VGCellularRequestParameters, debug: Bool = false) async throws -> [String: Any] {
         if let url = constructURL(params: params) {
-            let response = await cellularClient.get(url: url, headers: params.headers, maxRedirectCount: params.maxRedirectCount, timeout: params.timeout, debug: debug)
+            let response = await cellularClient.get(url: url, headers: params.headers, maxRedirectCount: params.maxRedirectCount, debug: debug, timeout: params.timeout)
             return response
         } else {
             throw VGCellularRequestError.invalidUrl
