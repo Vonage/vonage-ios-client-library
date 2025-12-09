@@ -461,6 +461,11 @@ class CellularConnectionManager {
                 
                 os_log("Response:\n %s", response)
                 
+                // Log all response headers if debug mode is enabled
+                if self.traceCollector.isDebugInfoCollectionEnabled {
+                    self.logResponseHeaders(response: response)
+                }
+                
                 let status = self.parseHttpStatusCode(response: response)
                 os_log("\n----\nHTTP status: %s", String(status))
                 
@@ -567,6 +572,26 @@ class CellularConnectionManager {
             position = range.upperBound
         }
         return (!cookies.isEmpty) ? cookies : nil
+    }
+    
+    func logResponseHeaders(response: String) {
+        // Find the end of headers section (indicated by \r\n\r\n)
+        guard let headerEndRange = response.range(of: "\r\n\r\n") else {
+            self.traceCollector.addDebug(log: "Could not find header section in response")
+            return
+        }
+        
+        let headerSection = response[..<headerEndRange.lowerBound]
+        self.traceCollector.addDebug(log: "=== Response Headers ===")
+        
+        // Split by \r\n to get individual header lines
+        let lines = headerSection.components(separatedBy: "\r\n")
+        for line in lines {
+            if !line.isEmpty {
+                self.traceCollector.addDebug(log: line)
+            }
+        }
+        self.traceCollector.addDebug(log: "========================")
     }
     
 }
