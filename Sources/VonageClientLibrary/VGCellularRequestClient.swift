@@ -16,12 +16,14 @@ enum VGCellularRequestError: Error {
     let headers: [String: String]
     let queryParameters: [String: String]
     let maxRedirectCount: Int
+    let timeout: TimeInterval
     
-    @objc public init(url: String, headers: [String : String], queryParameters: [String : String], maxRedirectCount: Int = 10) {
+    @objc public init(url: String, headers: [String : String], queryParameters: [String : String], maxRedirectCount: Int = 10, timeout: TimeInterval = 5.0) {
         self.url = url
         self.headers = headers
         self.queryParameters = queryParameters
         self.maxRedirectCount = maxRedirectCount
+        self.timeout = timeout
     }
 }
 
@@ -44,7 +46,7 @@ enum VGCellularRequestError: Error {
     ///   - debug: A flag to include or not the url trace in the response, defaults to false
     @objc public func startCellularGetRequest(params: VGCellularRequestParameters, debug: Bool = false) async throws -> [String: Any] {
         if let url = constructURL(params: params) {
-            let response = await cellularClient.get(url: url, headers: params.headers, maxRedirectCount: params.maxRedirectCount, debug: debug)
+            let response = await cellularClient.get(url: url, headers: params.headers, maxRedirectCount: params.maxRedirectCount, timeout: params.timeout, debug: debug)
             return response
         } else {
             throw VGCellularRequestError.invalidUrl

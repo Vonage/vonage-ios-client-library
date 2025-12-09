@@ -17,7 +17,7 @@ class CellularConnectionManager {
     
     // Mitigation for tcp timeout not triggering any events.
     private var timer: Timer?
-    private var CONNECTION_TIME_OUT = 5.0
+    private var connectionTimeout: TimeInterval = 5.0
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
@@ -27,7 +27,9 @@ class CellularConnectionManager {
         TraceCollector()
     }()
     
-    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, completion: @escaping ([String : Any]) -> Void) {
+    func get(url: URL, headers: [String: String], maxRedirectCount: Int, timeout: TimeInterval, debug: Bool, completion: @escaping ([String : Any]) -> Void) {
+        self.connectionTimeout = timeout
+        
         if (debug) {
             traceCollector.isDebugInfoCollectionEnabled = true
             traceCollector.isConsoleLogsEnabled = true
@@ -266,7 +268,7 @@ class CellularConnectionManager {
         }
         
         let tcpOptions = NWProtocolTCP.Options()
-        tcpOptions.connectionTimeout = 5 //Secs
+        tcpOptions.connectionTimeout = Int(connectionTimeout) //Secs
         tcpOptions.enableKeepalive = false
         
         var tlsOptions: NWProtocolTLS.Options?
@@ -349,7 +351,7 @@ class CellularConnectionManager {
         }
         
         os_log("Starting a new timer", type: .debug)
-        self.timer = Timer.scheduledTimer(timeInterval: self.CONNECTION_TIME_OUT,
+        self.timer = Timer.scheduledTimer(timeInterval: self.connectionTimeout,
                                           target: self,
                                           selector: #selector(self.fireTimer),
                                           userInfo: nil,
