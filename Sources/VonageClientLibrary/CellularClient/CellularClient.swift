@@ -9,7 +9,7 @@ import Foundation
 import CoreTelephony
 
 protocol CellularClient {
-    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool) async -> [String: Any]
+    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval) async -> [String: Any]
 }
 
 class VGCellularClient: CellularClient {
@@ -35,11 +35,11 @@ class VGCellularClient: CellularClient {
         }
     }
     
-    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool) async -> [String: Any] {
+    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval) async -> [String: Any] {
         return await withCheckedContinuation { continuation in
             var hasResumed = false
             let lock = NSLock()
-            connectionManager.get(url: url, headers: headers, maxRedirectCount: maxRedirectCount, debug: debug) { response in
+            connectionManager.get(url: url, headers: headers, maxRedirectCount: maxRedirectCount, debug: debug, timeout: timeout) { response in
                 lock.lock()
                 defer { lock.unlock() }
                 if !hasResumed {

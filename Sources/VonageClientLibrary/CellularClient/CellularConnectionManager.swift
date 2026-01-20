@@ -17,7 +17,7 @@ class CellularConnectionManager {
     
     // Mitigation for tcp timeout not triggering any events.
     private var timer: Timer?
-    private var CONNECTION_TIME_OUT = 5.0
+    private var connectionTimeout: TimeInterval = 5.0
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
@@ -27,7 +27,9 @@ class CellularConnectionManager {
         TraceCollector()
     }()
     
-    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, completion: @escaping ([String : Any]) -> Void) {
+    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, completion: @escaping ([String : Any]) -> Void) {
+        self.connectionTimeout = timeout
+        
         if (debug) {
             traceCollector.isDebugInfoCollectionEnabled = true
             traceCollector.isConsoleLogsEnabled = true
@@ -169,6 +171,22 @@ class CellularConnectionManager {
             case .preparing:
                 self?.traceCollector.addDebug(log: "Connection State: Preparing\n")
             case .ready:
+                if let tlsMetadata = self?.connection?.metadata(definition: NWProtocolTLS.definition) as? NWProtocolTLS.Metadata {
+                    // Extract the underlying sec_protocol_metadata_t
+                    let secMeta = tlsMetadata.securityProtocolMetadata
+
+                    // Query the negotiated TLS version
+                    let version = sec_protocol_metadata_get_negotiated_tls_protocol_version(secMeta)
+
+                    let versionString: String
+                    version.rawValue
+                       switch version {
+                       case .TLSv12: versionString = "TLS 1.2"
+                       case .TLSv13: versionString = "TLS 1.3"
+                       default: versionString = "Unknown TLS version (\(version.rawValue))"
+                       }
+                    print("using TLS version \(versionString)")
+                }
                 let msg = self?.connection.debugDescription ?? "No connection details"
                 self?.traceCollector.addDebug(log: "Connection State: Ready \(msg)\n")
                 readyStateHandler() //Send and Receive
@@ -250,7 +268,7 @@ class CellularConnectionManager {
         }
         
         let tcpOptions = NWProtocolTCP.Options()
-        tcpOptions.connectionTimeout = 5 //Secs
+        tcpOptions.connectionTimeout = Int(connectionTimeout) //Secs
         tcpOptions.enableKeepalive = false
         
         var tlsOptions: NWProtocolTLS.Options?
@@ -258,7 +276,16 @@ class CellularConnectionManager {
         
         if (scheme.starts(with:"https")) {
             fport = (port != nil ? NWEndpoint.Port(integerLiteral: NWEndpoint.Port.IntegerLiteralType(port!)) : NWEndpoint.Port.https)
-            tlsOptions = .init()
+
+            // tlsOptions = .init()
+            tlsOptions = NWProtocolTLS.Options()
+
+            // Force TLS 1.2
+            if let secOptions = tlsOptions?.securityProtocolOptions {
+                sec_protocol_options_set_min_tls_protocol_version(secOptions, .TLSv12)
+                sec_protocol_options_set_max_tls_protocol_version(secOptions, .TLSv12)
+            }
+
             tcpOptions.enableFastOpen = true //Save on tcp round trip by using first tls packet
         }
         
@@ -324,7 +351,7 @@ class CellularConnectionManager {
         }
         
         os_log("Starting a new timer", type: .debug)
-        self.timer = Timer.scheduledTimer(timeInterval: self.CONNECTION_TIME_OUT,
+        self.timer = Timer.scheduledTimer(timeInterval: self.connectionTimeout,
                                           target: self,
                                           selector: #selector(self.fireTimer),
                                           userInfo: nil,
@@ -436,6 +463,11 @@ class CellularConnectionManager {
                 
                 os_log("Response:\n %s", response)
                 
+                // Log all response headers if debug mode is enabled
+                if self.traceCollector.isDebugInfoCollectionEnabled {
+                    self.logResponseHeaders(response: response)
+                }
+                
                 let status = self.parseHttpStatusCode(response: response)
                 os_log("\n----\nHTTP status: %s", String(status))
                 
@@ -542,6 +574,26 @@ class CellularConnectionManager {
             position = range.upperBound
         }
         return (!cookies.isEmpty) ? cookies : nil
+    }
+    
+    func logResponseHeaders(response: String) {
+        // Find the end of headers section (indicated by \r\n\r\n)
+        guard let headerEndRange = response.range(of: "\r\n\r\n") else {
+            self.traceCollector.addDebug(log: "Could not find header section in response")
+            return
+        }
+        
+        let headerSection = response[..<headerEndRange.lowerBound]
+        self.traceCollector.addDebug(log: "=== Response Headers ===")
+        
+        // Split by \r\n to get individual header lines
+        let lines = headerSection.components(separatedBy: "\r\n")
+        for line in lines {
+            if !line.isEmpty {
+                self.traceCollector.addDebug(log: line)
+            }
+        }
+        self.traceCollector.addDebug(log: "========================")
     }
     
 }
