@@ -407,11 +407,14 @@ class CellularConnectionManager {
             if path.status == .satisfied {
                 hasCellularPath = true
                 self.traceCollector.addDebug(log: "Cellular path is satisfied – data connectivity available")
+            } else if path.status == .requiresConnection {
+                // The interface exists but is dormant (e.g. WiFi is active).
+                // NWConnection with requiredInterfaceType .cellular can activate it,
+                // so treat this as available and let the connection attempt proceed.
+                hasCellularPath = true
+                self.traceCollector.addDebug(log: "Cellular path requires connection – interface is dormant but available, will activate on use")
             } else if path.status == .unsatisfied {
                 self.traceCollector.addDebug(log: "Cellular path unsatisfied – no cellular data connectivity")
-            } else if path.status == .requiresConnection {
-                // The interface exists but isn't active yet; treat as unavailable.
-                self.traceCollector.addDebug(log: "Cellular path requires connection – treating as unavailable")
             }
         }
 
