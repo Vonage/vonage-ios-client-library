@@ -36,6 +36,22 @@ class VGCellularClient: CellularClient {
     }
     
     func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval) async -> [String: Any] {
+        // Perform the cellular connectivity check asynchronously, off the
+        // cooperative thread pool, before entering withCheckedContinuation.
+        let hasCellular = await connectionManager.checkCellularConnectivityAsync()
+        if !hasCellular {
+            var json = [String: Any]()
+            json["error"] = "sdk_no_data_connectivity"
+            json["error_description"] = "Data connectivity not available"
+            if debug {
+                var debugJson = [String: Any]()
+                debugJson["device_info"] = DebugInfo().deviceString()
+                debugJson["url_trace"] = ""
+                json["debug"] = debugJson
+            }
+            return json
+        }
+
         return await withCheckedContinuation { continuation in
             var hasResumed = false
             let lock = NSLock()

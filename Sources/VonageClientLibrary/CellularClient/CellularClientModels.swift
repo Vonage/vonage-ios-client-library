@@ -84,6 +84,7 @@ enum NetworkError: Error, Equatable {
     case tooManyRedirects
     case connectionFailed(String)
     case connectionCantBeCreated(String)
+    case sdkNoDataConnectivity(String)
     case other(String)
 }
 

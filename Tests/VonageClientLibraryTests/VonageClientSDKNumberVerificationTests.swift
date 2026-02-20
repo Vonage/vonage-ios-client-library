@@ -32,4 +32,15 @@ final class VonageClientLibraryTests: XCTestCase {
         
         XCTAssertEqual(cellularClient.urlString, "http://www.vonage.com?query-param=my%20value")
     }
+    
+    func testSdkNoDataConnectivityError() async throws {
+        let params = VGCellularRequestParameters(url: "http://www.vonage.com", headers: ["x-my-header": "My Value"], queryParameters: [:])
+        
+        let cellularClient = MockCellularClientWithConnectivityError()
+        let client = VGCellularRequestClient(cellularClient: cellularClient)
+        let result = try await client.startCellularGetRequest(params: params)
+        
+        XCTAssertEqual(result["error"] as? String, "sdk_no_data_connectivity")
+        XCTAssertEqual(result["error_description"] as? String, "Data connectivity not available")
+    }
 }
