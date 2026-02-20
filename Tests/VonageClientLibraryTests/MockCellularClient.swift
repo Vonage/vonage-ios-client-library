@@ -17,3 +17,14 @@ class MockCellularClient: CellularClient {
         return [:]
     }
 }
+
+class MockCellularClientWithConnectivityError: CellularClient {
+    func get(url: URL, headers: [String : String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval) async -> [String : Any] {
+        // Simulate the sdk_no_data_connectivity error response
+        // (mirrors the Android SDK's "Data connectivity not available" error)
+        var json: [String: Any] = [:]
+        json["error"] = "sdk_no_data_connectivity"
+        json["error_description"] = "Data connectivity not available"
+        return json
+    }
+}

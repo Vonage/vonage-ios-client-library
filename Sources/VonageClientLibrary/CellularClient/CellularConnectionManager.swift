@@ -21,7 +21,7 @@ class CellularConnectionManager {
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
-    private let sdkVersion = "1.0.4"
+    private let sdkVersion = "1.0.5-beta"
     
     lazy var traceCollector: TraceCollector = {
         TraceCollector()
@@ -40,6 +40,14 @@ class CellularConnectionManager {
         
         guard let _ = url.scheme, let _ = url.host else {
             completion(convertNetworkErrorToDictionary(err:NetworkError.other("No scheme or host found"), debug: debug))
+            return
+        }
+        
+        // Check for cellular connectivity before attempting connection
+        // (mirrors Android SDK's forceCellular → sdk_no_data_connectivity flow)
+        if !checkCellularConnectivity() {
+            traceCollector.addDebug(log: "Cellular connectivity check failed – no data path")
+            completion(convertNetworkErrorToDictionary(err: NetworkError.sdkNoDataConnectivity("Data connectivity not available"), debug: debug))
             return
         }
         
@@ -139,6 +147,9 @@ class CellularConnectionManager {
             json["error_description"] = string
         case .connectionCantBeCreated(let string):
             json["error"] = "sdk_connection_error"
+            json["error_description"] = string
+        case .sdkNoDataConnectivity(let string):
+            json["error"] = "sdk_no_data_connectivity"
             json["error_description"] = string
         case .other(let string):
             json["error"] = "sdk_error"
@@ -364,6 +375,55 @@ class CellularConnectionManager {
         checkResponseHandler(.err(NetworkError.connectionCantBeCreated("Connection cancelled - time out")))
     }
     
+    /// Checks if cellular data connectivity is available.
+    /// Mirrors the Android SDK's `forceCellular` check: requests a cellular-only network path
+    /// and verifies it is satisfied before proceeding. Returns true if cellular data is available
+    /// and usable, false if only WiFi, no connectivity, or cellular data is disabled.
+    private func checkCellularConnectivity() -> Bool {
+        #if targetEnvironment(simulator)
+        // Simulator has no cellular interface; skip the check so requests can proceed
+        // over whatever interface the simulator provides (mirrors createConnection behaviour).
+        self.traceCollector.addDebug(log: "Running on simulator – skipping cellular connectivity check")
+        return true
+        #else
+        // Use a cellular-specific path monitor (analogous to Android's
+        // NetworkRequest with TRANSPORT_CELLULAR + NET_CAPABILITY_INTERNET).
+        let cellularMonitor = NWPathMonitor(requiredInterfaceType: .cellular)
+        var hasCellularPath = false
+
+        // Semaphore to synchronously wait for the first path update.
+        let semaphore = DispatchSemaphore(value: 0)
+
+        cellularMonitor.pathUpdateHandler = { path in
+            defer { semaphore.signal() }
+
+            if path.status == .satisfied {
+                hasCellularPath = true
+                self.traceCollector.addDebug(log: "Cellular path is satisfied – data connectivity available")
+            } else if path.status == .unsatisfied {
+                self.traceCollector.addDebug(log: "Cellular path unsatisfied – no cellular data connectivity")
+            } else if path.status == .requiresConnection {
+                // The interface exists but isn't active yet; treat as unavailable.
+                self.traceCollector.addDebug(log: "Cellular path requires connection – treating as unavailable")
+            }
+        }
+
+        cellularMonitor.start(queue: .global(qos: .userInitiated))
+
+        // Wait up to 2 seconds for the path update (Android uses a 5-second timeout
+        // for the full network request; here we only need to discover the path status).
+        let timeoutResult = semaphore.wait(timeout: .now() + 2.0)
+        cellularMonitor.cancel()
+
+        if timeoutResult == .timedOut {
+            self.traceCollector.addDebug(log: "Cellular connectivity check timed out – no path available")
+            return false
+        }
+
+        return hasCellularPath
+        #endif
+    }
+
     func startMonitoring() {
         if let monitor = pathMonitor { monitor.cancel() }
         
