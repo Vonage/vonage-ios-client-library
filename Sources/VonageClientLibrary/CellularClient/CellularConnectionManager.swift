@@ -43,14 +43,6 @@ class CellularConnectionManager {
             return
         }
         
-        // Check for cellular connectivity before attempting connection
-        // (mirrors Android SDK's forceCellular → sdk_no_data_connectivity flow)
-        if !checkCellularConnectivity() {
-            traceCollector.addDebug(log: "Cellular connectivity check failed – no data path")
-            completion(convertNetworkErrorToDictionary(err: NetworkError.sdkNoDataConnectivity("Data connectivity not available"), debug: debug))
-            return
-        }
-        
         var redirectCount = 0
         // This closure will be called on main thread
         checkResponseHandler = { [weak self] (response) -> Void in
@@ -375,10 +367,25 @@ class CellularConnectionManager {
         checkResponseHandler(.err(NetworkError.connectionCantBeCreated("Connection cancelled - time out")))
     }
     
+    /// Asynchronously checks if cellular data connectivity is available.
+    /// Offloads the blocking NWPathMonitor + semaphore check to a GCD queue so that
+    /// Swift's cooperative thread pool is never blocked.
+    func checkCellularConnectivityAsync() async -> Bool {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = self.checkCellularConnectivity()
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
     /// Checks if cellular data connectivity is available.
     /// Mirrors the Android SDK's `forceCellular` check: requests a cellular-only network path
     /// and verifies it is satisfied before proceeding. Returns true if cellular data is available
     /// and usable, false if only WiFi, no connectivity, or cellular data is disabled.
+    ///
+    /// - Important: This method blocks the calling thread for up to 2 seconds.
+    ///   Prefer ``checkCellularConnectivityAsync()`` when called from an async context.
     private func checkCellularConnectivity() -> Bool {
         #if targetEnvironment(simulator)
         // Simulator has no cellular interface; skip the check so requests can proceed
