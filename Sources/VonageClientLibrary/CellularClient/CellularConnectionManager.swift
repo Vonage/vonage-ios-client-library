@@ -21,7 +21,7 @@ class CellularConnectionManager {
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
-    private let sdkVersion = "1.0.5-beta"
+    private let sdkVersion = "1.0.5"
     
     lazy var traceCollector: TraceCollector = {
         TraceCollector()
