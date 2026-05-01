@@ -43,4 +43,56 @@ final class VonageClientLibraryTests: XCTestCase {
         XCTAssertEqual(result["error"] as? String, "sdk_no_data_connectivity")
         XCTAssertEqual(result["error_description"] as? String, "Data connectivity not available")
     }
+
+    // MARK: - Logger tests
+
+    func testCustomLogger_receivesMessages() async throws {
+        let params = VGCellularRequestParameters(url: "http://www.vonage.com", headers: [:], queryParameters: [:])
+        let spyLogger = SpyLogger()
+        let mockClient = MockCellularClientWithDebugResponse()
+        let client = VGCellularRequestClient(cellularClient: mockClient)
+        client.logger = spyLogger
+
+        _ = try await client.startCellularGetRequest(params: params, debug: true)
+
+        XCTAssertTrue(spyLogger.messages.count > 0, "Logger should have received at least one message")
+        XCTAssertNotNil(mockClient.capturedLogger, "Logger should have been passed to the cellular client")
+    }
+
+    func testCustomLogger_isPassedToClient() async throws {
+        let params = VGCellularRequestParameters(url: "http://www.vonage.com", headers: [:], queryParameters: [:])
+        let spyLogger = SpyLogger()
+        let mockClient = MockCellularClientWithDebugResponse()
+        let client = VGCellularRequestClient(cellularClient: mockClient)
+        client.logger = spyLogger
+
+        _ = try await client.startCellularGetRequest(params: params)
+
+        XCTAssertTrue(mockClient.capturedLogger === spyLogger, "The exact logger instance should be forwarded to the cellular client")
+    }
+
+    func testDebugResponse_containsOperatorHeaders() async throws {
+        let params = VGCellularRequestParameters(url: "http://www.vonage.com", headers: [:], queryParameters: [:])
+        let mockClient = MockCellularClientWithDebugResponse()
+        let client = VGCellularRequestClient(cellularClient: mockClient)
+
+        let result = try await client.startCellularGetRequest(params: params, debug: true)
+
+        let debug = result["debug"] as? [String: Any]
+        XCTAssertNotNil(debug, "debug dict should be present when debug: true")
+        let operatorHeaders = debug?["operator_headers"] as? [String: [String]]
+        XCTAssertNotNil(operatorHeaders, "operator_headers should be present in debug dict")
+        XCTAssertEqual(operatorHeaders?["X-Orange-Trace-Id"], ["abc123"])
+        XCTAssertEqual(operatorHeaders?["X-Custom-Op"], ["val1", "val2"])
+    }
+
+    func testDebugResponse_operatorHeadersAbsentWhenDebugFalse() async throws {
+        let params = VGCellularRequestParameters(url: "http://www.vonage.com", headers: [:], queryParameters: [:])
+        let mockClient = MockCellularClientWithDebugResponse()
+        let client = VGCellularRequestClient(cellularClient: mockClient)
+
+        let result = try await client.startCellularGetRequest(params: params, debug: false)
+
+        XCTAssertNil(result["debug"], "debug dict should not be present when debug: false")
+    }
 }

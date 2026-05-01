@@ -21,14 +21,15 @@ class CellularConnectionManager {
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
-    private let sdkVersion = "1.0.5"
+    private let sdkVersion = "1.1.0"
     
     lazy var traceCollector: TraceCollector = {
         TraceCollector()
     }()
     
-    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, completion: @escaping ([String : Any]) -> Void) {
+    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, logger: VGLogger?, completion: @escaping ([String : Any]) -> Void) {
         self.connectionTimeout = timeout
+        traceCollector.logger = logger
         
         if (debug) {
             traceCollector.isDebugInfoCollectionEnabled = true
@@ -106,6 +107,7 @@ class CellularConnectionManager {
             var json_debug: [String : Any] = [:]
             json_debug["device_info"] = ti.debugInfo.deviceString()
             json_debug["url_trace"] = ti.trace
+            json_debug["operator_headers"] = self.traceCollector.operatorHeaders()
             json["debug"] = json_debug
             self.traceCollector.stopTrace()
         }
@@ -152,6 +154,7 @@ class CellularConnectionManager {
             var json_debug: [String : Any] = [:]
             json_debug["device_info"] = ti.debugInfo.deviceString()
             json_debug["url_trace"] = ti.trace
+            json_debug["operator_headers"] = self.traceCollector.operatorHeaders()
             json["debug"] = json_debug
             self.traceCollector.stopTrace()
         }
@@ -536,6 +539,7 @@ class CellularConnectionManager {
                 // Log all response headers if debug mode is enabled
                 if self.traceCollector.isDebugInfoCollectionEnabled {
                     self.logResponseHeaders(response: response)
+                    self.extractOperatorHeaders(response: response)
                 }
                 
                 let status = self.parseHttpStatusCode(response: response)
@@ -664,6 +668,24 @@ class CellularConnectionManager {
             }
         }
         self.traceCollector.addDebug(log: "========================")
+    }
+
+    /// Extracts `X-*` operator headers from a raw HTTP response and accumulates them
+    /// on the trace collector. Case-insensitive header name matching. Each unique name
+    /// collects all values seen across redirect hops.
+    func extractOperatorHeaders(response: String) {
+        guard let headerEndRange = response.range(of: "\r\n\r\n") else { return }
+        let headerSection = response[..<headerEndRange.lowerBound]
+        let lines = headerSection.components(separatedBy: "\r\n")
+        for line in lines {
+            guard let colonRange = line.range(of: ":") else { continue }
+            let name = String(line[..<colonRange.lowerBound]).trimmingCharacters(in: .whitespaces)
+            let value = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+            if name.lowercased().hasPrefix("x-") {
+                traceCollector.addOperatorHeader(name: name, value: value)
+                traceCollector.logger?.log("Operator header: \(name): \(value)", level: .debug)
+            }
+        }
     }
     
 }

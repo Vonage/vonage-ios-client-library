@@ -38,9 +38,7 @@ public class DebugInfo {
     }
     
     public func deviceString() -> String {
-        var device: String = ""
-        device = UIDevice.current.systemName + "/" + UIDevice.current.systemVersion
-        return device
+        return UIDevice.current.systemName + "/" + UIDevice.current.systemVersion
     }
 }
 
@@ -99,4 +97,3 @@ enum ConnectionResult {
     case dataErr(ConnectionResponse)
     case follow(RedirectResult)
 }
-

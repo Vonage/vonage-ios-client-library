@@ -29,6 +29,9 @@ enum VGCellularRequestError: Error {
 
 @objc public final class VGCellularRequestClient: NSObject {
     var cellularClient: CellularClient
+
+    /// Assign a custom logger to receive SDK log messages through your preferred logging framework.
+    @objc public var logger: VGLogger?
     
     override public init() {
         self.cellularClient = VGCellularClient()
@@ -43,10 +46,10 @@ enum VGCellularRequestError: Error {
     /// This method performs a GET request given a URL with cellular connectivity
     /// - Parameters:
     ///   - params: Parameters to configure your GET request
-    ///   - debug: A flag to include or not the url trace in the response, defaults to false
+    ///   - debug: A flag to include or not the url trace and operator headers in the response, defaults to false
     @objc public func startCellularGetRequest(params: VGCellularRequestParameters, debug: Bool = false) async throws -> [String: Any] {
         if let url = constructURL(params: params) {
-            let response = await cellularClient.get(url: url, headers: params.headers, maxRedirectCount: params.maxRedirectCount, debug: debug, timeout: params.timeout)
+            let response = await cellularClient.get(url: url, headers: params.headers, maxRedirectCount: params.maxRedirectCount, debug: debug, timeout: params.timeout, logger: logger)
             return response
         } else {
             throw VGCellularRequestError.invalidUrl

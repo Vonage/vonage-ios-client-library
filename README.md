@@ -47,6 +47,39 @@ let response = try await client.startCellularGetRequest(params: params, debug: t
 * `maxRedirectCount` in `VGCellularRequestParameters` is an optional and defaults to 10.
 * `debug` parameter for `startCellularRequest` is optional and defaults to false.
 
+### Custom Logging
+
+Assign a logger to receive SDK log messages through your preferred logging framework. Implement the `VGLogger` protocol and set it on the client:
+
+```swift
+import VonageClientLibrary
+
+class MyLogger: NSObject, VGLogger {
+    func log(_ message: String, level: VGLogLevel) {
+        // Forward to your preferred logging framework, e.g. OSLog, CocoaLumberjack, etc.
+        print("[\(level)] \(message)")
+    }
+}
+
+let client = VGCellularRequestClient()
+client.logger = MyLogger()
+```
+
+The logger receives all SDK messages regardless of whether `debug` is enabled. `VGLogLevel` values are `.debug`, `.info`, `.warning`, and `.error`.
+
+### Operator Headers
+
+When `debug: true`, any `X-*` headers returned in redirect responses (such as operator trace IDs like `X-Orange-Trace-Id`) are captured and returned in the response under `debug.operator_headers`. Multiple values for the same header (across redirect hops) are preserved as an array.
+
+```swift
+let response = try await client.startCellularGetRequest(params: params, debug: true)
+
+if let debug = response["debug"] as? [String: Any],
+   let operatorHeaders = debug["operator_headers"] as? [String: [String]] {
+    print(operatorHeaders) // e.g. ["X-Orange-Trace-Id": ["abc123"]]
+}
+```
+
 #### Responses
 
 * Success - When the data connectivity has been achieved, and a response has been received from the url endpoint:
@@ -58,7 +91,10 @@ let response = try await client.startCellularGetRequest(params: params, debug: t
     },
     "debug" : {
         "device_info": string, 
-        "url_trace" : string
+        "url_trace" : string,
+        "operator_headers": { // X-* headers seen across all hops
+            "X-Orange-Trace-Id": [string]
+        }
     }
 }
 ```
@@ -71,7 +107,10 @@ let response = try await client.startCellularGetRequest(params: params, debug: t
     "error_description": string,
     "debug" : {
         "device_info": string, 
-        "url_trace" : string
+        "url_trace" : string,
+        "operator_headers": { // X-* headers seen across all hops
+            "X-Orange-Trace-Id": [string]
+        }
     }
 }
 ```
