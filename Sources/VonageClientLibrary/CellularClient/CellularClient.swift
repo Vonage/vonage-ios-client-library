@@ -36,6 +36,9 @@ class VGCellularClient: CellularClient {
     }
     
     func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, logger: VGLogger?) async -> [String: Any] {
+        // Set the logger before the connectivity check so early trace logs reach the custom logger.
+        connectionManager.traceCollector.logger = logger
+
         // Perform the cellular connectivity check asynchronously, off the
         // cooperative thread pool, before entering withCheckedContinuation.
         let hasCellular = await connectionManager.checkCellularConnectivityAsync()

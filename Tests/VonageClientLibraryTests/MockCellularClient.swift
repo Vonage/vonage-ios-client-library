@@ -43,7 +43,7 @@ class MockCellularClientWithDebugResponse: CellularClient {
             var debugJson: [String: Any] = [:]
             debugJson["device_info"] = "iOS/17.0"
             debugJson["url_trace"] = ""
-            debugJson["operator_headers"] = ["X-Orange-Trace-Id": ["abc123"], "X-Custom-Op": ["val1", "val2"]]
+            debugJson["operator_headers"] = ["x-orange-trace-id": ["abc123"], "x-custom-op": ["val1", "val2"]]
             json["debug"] = debugJson
         }
         return json

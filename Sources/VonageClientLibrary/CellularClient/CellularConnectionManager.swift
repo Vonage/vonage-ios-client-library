@@ -682,7 +682,7 @@ class CellularConnectionManager {
             let name = String(line[..<colonRange.lowerBound]).trimmingCharacters(in: .whitespaces)
             let value = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
             if name.lowercased().hasPrefix("x-") {
-                traceCollector.addOperatorHeader(name: name, value: value)
+                traceCollector.addOperatorHeader(name: name.lowercased(), value: value)
                 traceCollector.logger?.log("Operator header: \(name): \(value)", level: .debug)
             }
         }

@@ -23,7 +23,7 @@ final class TraceCollector {
 
     /// Optional custom logger. When set, SDK log messages are forwarded here
     /// regardless of whether debug mode is enabled.
-    var logger: VGLogger?
+    weak var logger: VGLogger?
 
     /// Accumulates X-* operator headers seen across all hops (header name → array of values).
     private var _operatorHeaders: [String: [String]] = [:]

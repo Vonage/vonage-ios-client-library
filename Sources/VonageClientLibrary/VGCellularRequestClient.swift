@@ -31,7 +31,7 @@ enum VGCellularRequestError: Error {
     var cellularClient: CellularClient
 
     /// Assign a custom logger to receive SDK log messages through your preferred logging framework.
-    @objc public var logger: VGLogger?
+    @objc public weak var logger: VGLogger?
     
     override public init() {
         self.cellularClient = VGCellularClient()

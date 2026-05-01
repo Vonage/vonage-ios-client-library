@@ -55,7 +55,7 @@ final class VonageClientLibraryTests: XCTestCase {
 
         _ = try await client.startCellularGetRequest(params: params, debug: true)
 
-        XCTAssertTrue(spyLogger.messages.count > 0, "Logger should have received at least one message")
+        XCTAssertFalse(spyLogger.messages.isEmpty, "Logger should have received at least one message")
         XCTAssertNotNil(mockClient.capturedLogger, "Logger should have been passed to the cellular client")
     }
 
@@ -82,8 +82,8 @@ final class VonageClientLibraryTests: XCTestCase {
         XCTAssertNotNil(debug, "debug dict should be present when debug: true")
         let operatorHeaders = debug?["operator_headers"] as? [String: [String]]
         XCTAssertNotNil(operatorHeaders, "operator_headers should be present in debug dict")
-        XCTAssertEqual(operatorHeaders?["X-Orange-Trace-Id"], ["abc123"])
-        XCTAssertEqual(operatorHeaders?["X-Custom-Op"], ["val1", "val2"])
+        XCTAssertEqual(operatorHeaders?["x-orange-trace-id"], ["abc123"])
+        XCTAssertEqual(operatorHeaders?["x-custom-op"], ["val1", "val2"])
     }
 
     func testDebugResponse_operatorHeadersAbsentWhenDebugFalse() async throws {

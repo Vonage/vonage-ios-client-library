@@ -76,7 +76,7 @@ let response = try await client.startCellularGetRequest(params: params, debug: t
 
 if let debug = response["debug"] as? [String: Any],
    let operatorHeaders = debug["operator_headers"] as? [String: [String]] {
-    print(operatorHeaders) // e.g. ["X-Orange-Trace-Id": ["abc123"]]
+    print(operatorHeaders) // e.g. ["x-orange-trace-id": ["abc123"]]
 }
 ```
 
