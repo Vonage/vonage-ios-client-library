@@ -21,15 +21,21 @@ final class TraceCollector {
     var isDebugInfoCollectionEnabled = false
     var isConsoleLogsEnabled = false
 
+    /// Optional custom logger. When set, SDK log messages are forwarded here
+    /// regardless of whether debug mode is enabled.
+    weak var logger: VGLogger?
+
+    /// Accumulates X-* operator headers seen across all hops (header name → array of values).
+    private var _operatorHeaders: [String: [String]] = [:]
+
     /// Stops trace and clears the internal buffer
     func startTrace() {
         queue.sync() {
             if !isTraceEnabled {
                 isTraceEnabled = true
-                //
                 trace.removeAll()
                 debugInfo.clear()
-                //
+                _operatorHeaders.removeAll()
                 trace.append("\(debugInfo.deviceString())\n")
                 debugInfo.add(log:"\(debugInfo.deviceString())\n")
             } else {
@@ -44,9 +50,9 @@ final class TraceCollector {
             isTraceEnabled = false
             isDebugInfoCollectionEnabled = false
             isConsoleLogsEnabled = false
-            //
             trace.removeAll()
             debugInfo.clear()
+            _operatorHeaders.removeAll()
         }
     }
 
@@ -75,6 +81,27 @@ final class TraceCollector {
         if self.isConsoleLogsEnabled {
             os_log("%s", type:type, log)
         }
+        let level: VGLogLevel
+        switch type {
+        case .error: level = .error
+        case .info: level = .info
+        default: level = .debug
+        }
+        logger?.log(log, level: level)
+    }
+
+    /// Accumulates an `X-*` operator header value. Thread-safe.
+    func addOperatorHeader(name: String, value: String) {
+        queue.sync {
+            var values = _operatorHeaders[name] ?? []
+            values.append(value)
+            _operatorHeaders[name] = values
+        }
+    }
+
+    /// Returns a snapshot of all accumulated operator headers. Thread-safe.
+    func operatorHeaders() -> [String: [String]] {
+        queue.sync { _operatorHeaders }
     }
     
     func addBody(body: [String : Any]?) {
