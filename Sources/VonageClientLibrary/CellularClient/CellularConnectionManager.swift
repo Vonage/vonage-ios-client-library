@@ -21,7 +21,25 @@ class CellularConnectionManager {
     private var pathMonitor: NWPathMonitor?
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
-    private let sdkVersion = "1.1.0"
+    private var sdkVersion: String {
+        resolveSDKVersion()
+    }
+    
+    private func resolveSDKVersion() -> String {
+        let bundle = Bundle(for: CellularConnectionManager.self)
+        
+        if let shortVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+           !shortVersion.isEmpty {
+            return shortVersion
+        }
+        
+        if let buildVersion = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+           !buildVersion.isEmpty {
+            return buildVersion
+        }
+        
+        return "unknown"
+    }
     
     lazy var traceCollector: TraceCollector = {
         TraceCollector()
