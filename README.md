@@ -45,7 +45,7 @@ let response = try await client.startCellularGetRequest(params: params, debug: t
 ```
 
 * `maxRedirectCount` in `VGCellularRequestParameters` is an optional and defaults to 10.
-* `debug` parameter for `startCellularRequest` is optional and defaults to false.
+* `debug` parameter for `startCellularGetRequest` is optional and defaults to false.
 
 ### Cellular Connectivity Pre-Check
 
