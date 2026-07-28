@@ -47,6 +47,45 @@ let response = try await client.startCellularGetRequest(params: params, debug: t
 * `maxRedirectCount` in `VGCellularRequestParameters` is an optional and defaults to 10.
 * `debug` parameter for `startCellularRequest` is optional and defaults to false.
 
+### Cellular Connectivity Pre-Check
+
+Before crafting a request or workflow, you can check whether cellular data connectivity is available. `startCellularGetRequest` already performs this check internally (returning an `sdk_no_data_connectivity` error when unavailable), but exposing it as a standalone call lets you branch your logic *before* making a request.
+
+```swift
+import VonageClientLibrary
+
+let client = VGCellularRequestClient()
+
+let hasCellular = await client.checkCellularConnectivity()
+if !hasCellular {
+    // Cellular data is not available (WiFi only, no connectivity, or cellular data disabled).
+    // Handle accordingly before attempting a request.
+}
+```
+
+`checkCellularConnectivity()` returns `true` when a cellular data path is available (or dormant but activatable), and `false` when only WiFi is available, there is no connectivity, or cellular data is disabled. It always returns `true` on the simulator, which has no cellular interface.
+
+#### Using the Pre-Check with Vonage Verify
+
+This is especially useful when building a [Vonage Verify](https://developer.vonage.com/en/verify/overview) workflow. Silent Authentication (Advanced) requires cellular data, so if the pre-check returns `false` you can omit it from your requested workflow, since it is guaranteed to fail, and fall back to another channel such as SMS.
+
+```swift
+let client = VGCellularRequestClient()
+
+// Decide which Verify workflow to request based on cellular availability.
+var workflow: [[String: String]] = []
+
+if await client.checkCellularConnectivity() {
+    // Cellular data available — Silent Auth Advanced can succeed.
+    workflow.append(["channel": "silent_auth"])
+}
+
+// Always include a fallback channel.
+workflow.append(["channel": "sms"])
+
+// Send `workflow` to your backend to start the Verify request.
+```
+
 ### Custom Logging
 
 Assign a logger to receive SDK log messages through your preferred logging framework. Implement the `VGLogger` protocol and set it on the client:
