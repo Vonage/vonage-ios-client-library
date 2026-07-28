@@ -212,6 +212,13 @@ class CellularConnectionManager {
                 }
                 let msg = self?.connection.debugDescription ?? "No connection details"
                 self?.traceCollector.addDebug(log: "Connection State: Ready \(msg)\n")
+                if let self = self {
+                    // IP-DIAG: the actual address family the socket landed on after resolution.
+                    self.traceCollector.addDebug(log: "IP-DIAG resolved remote endpoint: \(self.describeRemoteEndpoint(self.connection))")
+                    if let path = self.connection?.currentPath {
+                        self.traceCollector.addDebug(log: "IP-DIAG path supportsIPv4=\(path.supportsIPv4) supportsIPv6=\(path.supportsIPv6) usesCellular=\(path.usesInterfaceType(.cellular))")
+                    }
+                }
                 readyStateHandler() //Send and Receive
             case .waiting(let error):
                 self?.traceCollector.addDebug(log: "Connection State: Waiting \(error.localizedDescription) \n")
@@ -282,6 +289,47 @@ class CellularConnectionManager {
         return cmd
     }
     
+    // MARK: - IP diagnostics (TEMPORARY — IPv6 investigation, see branch ipv6-diagnostics)
+
+    /// Classifies a URL host string as an IPv4 literal, IPv6 literal, or a hostname (DNS-resolved).
+    /// Helps distinguish "operator handed us an IP literal" (we can't influence the family) from
+    /// "we resolved a hostname" (Happy Eyeballs / IP-version preference applies).
+    private func classifyHost(_ host: String) -> String {
+        if IPv4Address(host) != nil { return "IPv4-literal" }
+        // IPv6 literals may appear bracketed inside a URL host, e.g. [2001:db8::1]
+        let stripped = (host.hasPrefix("[") && host.hasSuffix("]"))
+            ? String(host.dropFirst().dropLast())
+            : host
+        if IPv6Address(stripped) != nil { return "IPv6-literal" }
+        return "hostname"
+    }
+
+    /// Describes the ACTUAL resolved remote endpoint of a connection and its address family.
+    /// This is the key datapoint: it reports whether the socket landed on IPv4 or IPv6 after
+    /// DNS resolution + Happy Eyeballs over the cellular interface.
+    private func describeRemoteEndpoint(_ connection: NWConnection?) -> String {
+        guard let endpoint = connection?.currentPath?.remoteEndpoint else {
+            return "unknown (no currentPath.remoteEndpoint)"
+        }
+        switch endpoint {
+        case .hostPort(let host, let port):
+            switch host {
+            case .ipv4(let addr):
+                return "IPv4 \(addr) :\(port.rawValue)"
+            case .ipv6(let addr):
+                // NAT64-synthesized addresses (e.g. prefix 64:ff9b:: or a carrier prefix) are still
+                // IPv6 on the wire; the raw address below lets you spot a NAT64 prefix by eye.
+                return "IPv6 \(addr) :\(port.rawValue)"
+            case .name(let name, _):
+                return "unresolved name \(name) :\(port.rawValue)"
+            @unknown default:
+                return "unknown host form :\(port.rawValue)"
+            }
+        default:
+            return "\(endpoint)"
+        }
+    }
+
     func createConnection(scheme: String, host: String, port: Int? = nil) -> NWConnection? {
         if scheme.isEmpty ||
             host.isEmpty ||
@@ -327,6 +375,11 @@ class CellularConnectionManager {
         self.traceCollector.addDebug(log: "connection scheme on simulator \(scheme) \(String(fport.rawValue))")
         #endif
         
+        // IP-DIAG: classify the target host (literal vs hostname) and note the IP-version
+        // preference. The SDK sets no preference, so this is Happy Eyeballs default (.any),
+        // which prefers IPv6 when the host resolves to both and IPv6 is usable.
+        self.traceCollector.addDebug(log: "IP-DIAG target host '\(host)' is a \(classifyHost(host)); IP-version preference: any (default, no preference set)")
+
         connection = NWConnection(host: NWEndpoint.Host(host), port: fport, using: params)
         
         return connection
@@ -358,7 +411,13 @@ class CellularConnectionManager {
             // some location header are not properly encoded
             let cleanRedirect = redirect.replacingOccurrences(of: " ", with: "+")
             if let redirectURL =  URL(string: String(cleanRedirect)) {
-                return RedirectResult(url: redirectURL.host == nil ? URL(string: redirectURL.description, relativeTo: requestUrl)! : redirectURL, cookies: self.parseCookies(url:requestUrl, response: response, existingCookies: cookies))
+                let finalURL = redirectURL.host == nil ? URL(string: redirectURL.description, relativeTo: requestUrl)! : redirectURL
+                // IP-DIAG: is the operator handing us an IP literal (family fixed, we can't
+                // influence it) or a hostname (resolution / IP-version preference applies)?
+                if let redirectHost = finalURL.host {
+                    self.traceCollector.addDebug(log: "IP-DIAG redirect Location host '\(redirectHost)' is a \(classifyHost(redirectHost))")
+                }
+                return RedirectResult(url: finalURL, cookies: self.parseCookies(url:requestUrl, response: response, existingCookies: cookies))
             } else {
                 self.traceCollector.addDebug(log: "URL malformed \(cleanRedirect)")
                 return nil
