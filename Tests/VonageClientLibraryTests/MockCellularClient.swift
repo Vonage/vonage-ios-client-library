@@ -11,10 +11,15 @@ import Foundation
 
 class MockCellularClient: CellularClient {
     var urlString: String = ""
-    
+    var connectivityResult: Bool = true
+
     func get(url: URL, headers: [String : String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, logger: VGLogger?) async -> [String : Any] {
         self.urlString = url.absoluteString
         return [:]
+    }
+
+    func checkCellularConnectivity(logger: VGLogger?) async -> Bool {
+        return connectivityResult
     }
 }
 
@@ -26,6 +31,10 @@ class MockCellularClientWithConnectivityError: CellularClient {
         json["error"] = "sdk_no_data_connectivity"
         json["error_description"] = "Data connectivity not available"
         return json
+    }
+
+    func checkCellularConnectivity(logger: VGLogger?) async -> Bool {
+        return false
     }
 }
 
@@ -47,6 +56,11 @@ class MockCellularClientWithDebugResponse: CellularClient {
             json["debug"] = debugJson
         }
         return json
+    }
+
+    func checkCellularConnectivity(logger: VGLogger?) async -> Bool {
+        capturedLogger = logger
+        return true
     }
 }
 

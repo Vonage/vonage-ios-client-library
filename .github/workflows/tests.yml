@@ -1,0 +1,46 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run unit tests
+    # Standard macOS runners are free for public repositories and come with
+    # Xcode + iOS simulators preinstalled. No larger/paid runners required.
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Select an available iOS simulator
+        id: sim
+        run: |
+          # Device model/OS names differ across runner images, so resolve the
+          # first available iPhone simulator by UDID rather than hardcoding a name.
+          DEVICE_ID=$(xcrun simctl list devices available | grep 'iPhone' | head -1 | grep -oE '[0-9A-F-]{36}')
+          if [ -z "$DEVICE_ID" ]; then
+            echo "No available iPhone simulator found" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          echo "Using simulator UDID: $DEVICE_ID"
+          echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme VonageClientLibrary \
+            -destination "id=${{ steps.sim.outputs.device_id }}"

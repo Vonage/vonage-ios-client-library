@@ -10,6 +10,9 @@ import CoreTelephony
 
 protocol CellularClient {
     func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, logger: VGLogger?) async -> [String: Any]
+
+    /// Checks whether cellular data connectivity is available without performing a request.
+    func checkCellularConnectivity(logger: VGLogger?) async -> Bool
 }
 
 class VGCellularClient: CellularClient {
@@ -35,13 +38,20 @@ class VGCellularClient: CellularClient {
         }
     }
     
-    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, logger: VGLogger?) async -> [String: Any] {
-        // Set the logger before the connectivity check so early trace logs reach the custom logger.
+    /// Checks whether cellular data connectivity is available without performing a request.
+    /// This is the same check `get(...)` performs internally before making a request, exposed
+    /// so callers can pre-check connectivity (e.g. to branch a Verify workflow).
+    func checkCellularConnectivity(logger: VGLogger?) async -> Bool {
+        // Set the logger before the connectivity check so trace logs reach the custom logger.
         connectionManager.traceCollector.logger = logger
+        return await connectionManager.checkCellularConnectivityAsync()
+    }
 
+    func get(url: URL, headers: [String: String], maxRedirectCount: Int, debug: Bool, timeout: TimeInterval, logger: VGLogger?) async -> [String: Any] {
         // Perform the cellular connectivity check asynchronously, off the
         // cooperative thread pool, before entering withCheckedContinuation.
-        let hasCellular = await connectionManager.checkCellularConnectivityAsync()
+        // Reuses the same check exposed publicly so there is a single source of truth.
+        let hasCellular = await checkCellularConnectivity(logger: logger)
         if !hasCellular {
             logger?.log("sdk_no_data_connectivity: Data connectivity not available", level: .error)
             var json = [String: Any]()

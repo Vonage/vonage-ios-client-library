@@ -43,6 +43,20 @@ enum VGCellularRequestError: Error {
         self.cellularClient = cellularClient
     }
     
+    /// Checks whether cellular data connectivity is currently available, without performing a request.
+    ///
+    /// Use this to pre-check connectivity before crafting a request or workflow. For example, when
+    /// building a Vonage Verify workflow, you can skip Silent Auth Advanced (which requires cellular
+    /// data) when this returns `false`, since it is expected to fail without a cellular data path.
+    ///
+    /// This runs the same check that `startCellularGetRequest(params:debug:)` performs internally.
+    /// - Returns: `true` if a cellular data path is available (or dormant but activatable), `false`
+    ///   if only WiFi, no connectivity, or cellular data is disabled. Always returns `true` on the
+    ///   simulator, which has no cellular interface.
+    @objc public func checkCellularConnectivity() async -> Bool {
+        return await cellularClient.checkCellularConnectivity(logger: logger)
+    }
+
     /// This method performs a GET request given a URL with cellular connectivity
     /// - Parameters:
     ///   - params: Parameters to configure your GET request

@@ -44,6 +44,28 @@ final class VonageClientLibraryTests: XCTestCase {
         XCTAssertEqual(result["error_description"] as? String, "Data connectivity not available")
     }
 
+    // MARK: - Connectivity pre-check tests
+
+    func testCheckCellularConnectivity_returnsTrueWhenAvailable() async throws {
+        let cellularClient = MockCellularClient()
+        cellularClient.connectivityResult = true
+        let client = VGCellularRequestClient(cellularClient: cellularClient)
+
+        let result = await client.checkCellularConnectivity()
+
+        XCTAssertTrue(result, "Pre-check should return true when cellular connectivity is available")
+    }
+
+    func testCheckCellularConnectivity_returnsFalseWhenUnavailable() async throws {
+        let cellularClient = MockCellularClient()
+        cellularClient.connectivityResult = false
+        let client = VGCellularRequestClient(cellularClient: cellularClient)
+
+        let result = await client.checkCellularConnectivity()
+
+        XCTAssertFalse(result, "Pre-check should return false when cellular connectivity is unavailable")
+    }
+
     // MARK: - Logger tests
 
     func testCustomLogger_receivesMessages() async throws {
