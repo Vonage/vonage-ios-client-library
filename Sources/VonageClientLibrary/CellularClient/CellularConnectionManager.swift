@@ -37,10 +37,9 @@ class CellularConnectionManager {
            !buildVersion.isEmpty {
             return buildVersion
         }
-        
         return "unknown"
     }
-    
+
     lazy var traceCollector: TraceCollector = {
         TraceCollector()
     }()
