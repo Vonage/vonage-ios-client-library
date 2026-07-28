@@ -47,7 +47,7 @@ enum VGCellularRequestError: Error {
     ///
     /// Use this to pre-check connectivity before crafting a request or workflow. For example, when
     /// building a Vonage Verify workflow, you can skip Silent Auth Advanced (which requires cellular
-    /// data) if this returns `false`, since it is guaranteed to fail.
+    /// data) when this returns `false`, since it is expected to fail without a cellular data path.
     ///
     /// This runs the same check that `startCellularGetRequest(params:debug:)` performs internally.
     /// - Returns: `true` if a cellular data path is available (or dormant but activatable), `false`
