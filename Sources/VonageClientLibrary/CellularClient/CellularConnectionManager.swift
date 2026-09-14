@@ -11,6 +11,13 @@ import os
 
 typealias ResultHandler = (ConnectionResult) -> Void
 
+/// Outcome of one `receive` callback while reading a response.
+enum ReceiveStep: Equatable {
+    case needsMore(Data)
+    case complete(Data)
+    case failed(String)
+}
+
 
 class CellularConnectionManager {
     private var connection: NWConnection?
@@ -540,63 +547,107 @@ class CellularConnectionManager {
         
         timer?.invalidate()
         
-        //Read the entire response body
-        connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, context, isComplete, error in
-            
-            os_log("Receive isComplete: %s", isComplete.description)
-            if let err = error {
-                completion(.err(NetworkError.other(err.localizedDescription)))
+        // Armed while reading and re-armed after each read, so a peer that stalls mid-response
+        // fails instead of waiting forever.
+        createTimer()
+        
+        receiveResponse(requestUrl: requestUrl, accumulated: Data(), cookies: cookies, completion: completion)
+    }
+    
+    /// Pure so the accumulation rule can be tested without a live connection.
+    func nextReceiveStep(accumulated: Data, chunk: Data?, isComplete: Bool, error: Error?) -> ReceiveStep {
+        if let error = error {
+            return .failed(error.localizedDescription)
+        }
+        
+        var buffer = accumulated
+        if let chunk = chunk, !chunk.isEmpty {
+            buffer.append(chunk)
+        }
+        
+        return isComplete ? .complete(buffer) : .needsMore(buffer)
+    }
+    
+    /// Reads until the peer signals completion, accumulating as it goes.
+    ///
+    /// A single `receive` returns as soon as any bytes are available, so on cellular a response
+    /// spanning several TCP segments would be truncated or seen as empty. The request sends
+    /// `Connection: close`, so the peer closing marks completion. Android fixed the same bug in
+    /// DEVX-11222.
+    private func receiveResponse(requestUrl: URL, accumulated: Data, cookies: [HTTPCookie]?, completion: @escaping ResultHandler) {
+        connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            guard let self = self else {
+                completion(.err(NetworkError.other("Unable to carry on")))
                 return
             }
             
-            if let d = data, !d.isEmpty, let response = self.decodeResponse(data: d) {
+            os_log("Receive isComplete: %s", isComplete.description)
+            
+            switch self.nextReceiveStep(accumulated: accumulated, chunk: data, isComplete: isComplete, error: error) {
+            case .failed(let description):
+                self.timer?.invalidate()
+                completion(.err(NetworkError.other(description)))
                 
-                os_log("Response:\n %s", response)
+            case .needsMore(let buffer):
+                os_log("Partial response: %s bytes so far", String(buffer.count))
+                self.createTimer()
+                self.receiveResponse(requestUrl: requestUrl, accumulated: buffer, cookies: cookies, completion: completion)
                 
-                // Log all response headers if debug mode is enabled
-                if self.traceCollector.isDebugInfoCollectionEnabled {
-                    self.logResponseHeaders(response: response)
-                    self.extractOperatorHeaders(response: response)
-                }
-                
-                let status = self.parseHttpStatusCode(response: response)
-                os_log("\n----\nHTTP status: %s", String(status))
-                
-                switch status {
-                case 200...202:
-                    if let r = self.getResponseBody(response: response) {
-                        completion(.dataOK(ConnectionResponse(status: status, body: r)))
-                    } else {
-                        completion(.dataOK(ConnectionResponse(status: status, body: nil)))
-                    }
-                case 204:
-                    completion(.dataOK(ConnectionResponse(status: status, body: nil)))
-                case 301...303, 307...308:
-                    guard let ru = self.parseRedirect(requestUrl: requestUrl, response: response, cookies: cookies) else {
-                        completion(.err(NetworkError.invalidRedirectURL("Invalid URL - unable to parseRedirect")))
-                        return
-                    }
-                    completion(.follow(ru))
-                case 309...399:
-                    completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
-                case 400...451:
-                    if let r = self.getResponseBody(response: response) {
-                        completion(.dataErr(ConnectionResponse(status: status, body:r)))
-                    } else {
-                        completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
-                    }
-                case 500...511:
-                    if let r = self.getResponseBody(response: response) {
-                        completion(.dataErr(ConnectionResponse(status: status, body:r)))
-                    } else {
-                        completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
-                    }
-                default:
-                    completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
-                }
-            } else {
-                completion(.err(NetworkError.other("Response has no data or corrupt")))
+            case .complete(let buffer):
+                self.timer?.invalidate()
+                self.handleResponse(requestUrl: requestUrl, responseData: buffer, cookies: cookies, completion: completion)
             }
+        }
+    }
+    
+    func handleResponse(requestUrl: URL, responseData: Data, cookies: [HTTPCookie]?, completion: @escaping ResultHandler) {
+        guard !responseData.isEmpty, let response = self.decodeResponse(data: responseData) else {
+            completion(.err(NetworkError.other("Response has no data or corrupt")))
+            return
+        }
+        
+        os_log("Response:\n %s", response)
+        
+        // Log all response headers if debug mode is enabled
+        if self.traceCollector.isDebugInfoCollectionEnabled {
+            self.logResponseHeaders(response: response)
+            self.extractOperatorHeaders(response: response)
+        }
+        
+        let status = self.parseHttpStatusCode(response: response)
+        os_log("\n----\nHTTP status: %s", String(status))
+        
+        switch status {
+        case 200...202:
+            if let r = self.getResponseBody(response: response) {
+                completion(.dataOK(ConnectionResponse(status: status, body: r)))
+            } else {
+                completion(.dataOK(ConnectionResponse(status: status, body: nil)))
+            }
+        case 204:
+            completion(.dataOK(ConnectionResponse(status: status, body: nil)))
+        case 301...303, 307...308:
+            guard let ru = self.parseRedirect(requestUrl: requestUrl, response: response, cookies: cookies) else {
+                completion(.err(NetworkError.invalidRedirectURL("Invalid URL - unable to parseRedirect")))
+                return
+            }
+            completion(.follow(ru))
+        case 309...399:
+            completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
+        case 400...451:
+            if let r = self.getResponseBody(response: response) {
+                completion(.dataErr(ConnectionResponse(status: status, body:r)))
+            } else {
+                completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
+            }
+        case 500...511:
+            if let r = self.getResponseBody(response: response) {
+                completion(.dataErr(ConnectionResponse(status: status, body:r)))
+            } else {
+                completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
+            }
+        default:
+            completion(.err(NetworkError.other("Unexpected HTTP Status \(status)")))
         }
     }
     
