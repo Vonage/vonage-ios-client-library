@@ -358,7 +358,18 @@ class CellularConnectionManager {
             // some location header are not properly encoded
             let cleanRedirect = redirect.replacingOccurrences(of: " ", with: "+")
             if let redirectURL =  URL(string: String(cleanRedirect)) {
-                return RedirectResult(url: redirectURL.host == nil ? URL(string: redirectURL.description, relativeTo: requestUrl)! : redirectURL, cookies: self.parseCookies(url:requestUrl, response: response, existingCookies: cookies))
+                let resolved = redirectURL.host == nil ? URL(string: redirectURL.description, relativeTo: requestUrl)! : redirectURL
+
+                // Refuse to follow a secure request onto plaintext. The Android SDK blocks this
+                // too, so the platforms otherwise disagree on the same redirect. A relative
+                // Location inherits the scheme from requestUrl and so is never a downgrade.
+                if requestUrl.scheme?.lowercased() == "https", resolved.scheme?.lowercased() == "http" {
+                    self.traceCollector.addDebug(type: .error, log: "Blocked HTTPS-to-HTTP redirect downgrade")
+                    self.traceCollector.addTrace(log: "Blocked HTTPS-to-HTTP redirect downgrade")
+                    return nil
+                }
+
+                return RedirectResult(url: resolved, cookies: self.parseCookies(url:requestUrl, response: response, existingCookies: cookies))
             } else {
                 self.traceCollector.addDebug(log: "URL malformed \(cleanRedirect)")
                 return nil
