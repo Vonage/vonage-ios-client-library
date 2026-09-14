@@ -337,12 +337,15 @@ class CellularConnectionManager {
         return Int(status) ?? 0
     }
     
-    /// Decodes a response, first attempting with UTF8 and then fallback to ascii
+    /// Decodes a response, first attempting with UTF8 and then fallback to ISO-8859-1
     /// - Parameter data: Data which contains the response
     /// - Returns: decoded response as String
     func decodeResponse(data: Data) -> String? {
         guard let response = String(data: data, encoding: .utf8) else {
-            return String(data: data, encoding: .ascii)
+            // Not UTF-8. ISO-8859-1 has no invalid byte sequences, so this cannot fail. The
+            // previous .ascii fallback returned nil for any byte above 127, which surfaced as
+            // "Response has no data or corrupt".
+            return String(data: data, encoding: .isoLatin1)
         }
         return response
     }
