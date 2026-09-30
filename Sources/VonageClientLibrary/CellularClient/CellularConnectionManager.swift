@@ -22,22 +22,7 @@ class CellularConnectionManager {
     private var checkResponseHandler: ResultHandler!
     private var debugInfo = DebugInfo()
     private var sdkVersion: String {
-        resolveSDKVersion()
-    }
-    
-    private func resolveSDKVersion() -> String {
-        let bundle = Bundle(for: CellularConnectionManager.self)
-        
-        if let shortVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
-           !shortVersion.isEmpty {
-            return shortVersion
-        }
-        
-        if let buildVersion = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
-           !buildVersion.isEmpty {
-            return buildVersion
-        }
-        return "unknown"
+        SDKVersion.current
     }
 
     lazy var traceCollector: TraceCollector = {

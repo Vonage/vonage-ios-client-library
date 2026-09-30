@@ -1,6 +1,10 @@
 Pod::Spec.new do |spec|
+    version_file = File.read(File.join(__dir__, "Sources/VonageClientLibrary/SDKVersion.swift"))
+    match = version_file.match(/static let current = "([^"]+)"/)
+    raise "Unable to determine SDK version from SDKVersion.swift" unless match
+
     spec.name         = "VonageClientLibrary"
-    spec.version      = "1.2.0"
+    spec.version      = match[1]
     spec.summary      = "A library to support using the Vonage APIs on iOS"
     spec.homepage     = "https://github.com/Vonage/vonage-ios-client-library"
     spec.license      = { :type => "Apache 2.0", :file => "LICENSE" }
