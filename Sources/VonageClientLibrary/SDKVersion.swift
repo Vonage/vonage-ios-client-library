@@ -16,5 +16,5 @@
 ///
 /// - Important: Update `current` at release time. Nothing else needs to change.
 enum SDKVersion {
-    static let current = "1.2.0"
+    static let current = "1.3.0"
 }
